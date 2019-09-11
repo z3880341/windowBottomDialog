@@ -1,20 +1,16 @@
 package com.yt.kangaroo.widgets.windowBottomDialog;
 
 import android.app.Activity;
-import android.content.Context;
-import android.text.TextUtils;
-import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.Gravity;
-import android.view.View;
-import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.LinearLayout;
 import android.widget.PopupWindow;
-import android.widget.TextView;
 
-import com.yt.kangaroo.R;
-import com.yt.kangaroo.utils.L;
+import androidx.constraintlayout.widget.ConstraintLayout;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+
 /**
  *@content:界面下方对话框实现工具类
  *@time:2019-2-21
@@ -23,129 +19,101 @@ import com.yt.kangaroo.utils.L;
 
 public class WindowBottomDialogUtil {
     private static final String TAG = "WindowBottomDialogUtil";
-    private Context mContext;
     private PopupWindow mPopupWindow;
-    private LinearLayout mLinearLayout;
-    private WindowBottomDialogConfig mConfig;
+//    private LinearLayout mLinearLayout;
+    private ConstraintLayout mConstraintLayout;
+    private WindowBottomDialog mConfig;
+    private WindowBottomDialogAdapter mWindowBottomDialogAdapter;
 
-    protected WindowBottomDialogUtil(WindowBottomDialogConfig config){
+    protected WindowBottomDialogUtil(WindowBottomDialog config){
         this.mConfig = config;
-        this.mContext = mConfig.mActivity.getApplicationContext();
-        if (mConfig.mActivity == null){
-            Log.e(TAG, "WindowBottomDialogUtil:你传入的 Activity 为空");
-            mConfig.mListener.onError("你传入的 Activity 为空");
+        if (mConfig.context == null){
+            Log.e(TAG, "WindowBottomDialogUtil:context is null");
+            onError("context is null");
             return;
         }
-        initLayout();
+        if (mConfig.itemTextList == null){
+            onError("itemTextList is null");
+            return;
+
+        }
+        if (mConfig.itemTextColorEnum == WindowBottomDialog.ItemTextColorEnum.ALONE){
+            if (mConfig.itemTextColorList == null){
+                onError("itemTextColorList is null");
+                return;
+            }
+            if (mConfig.itemTextColorList.size() != mConfig.itemTextList.size()){
+                onError("颜色List 与 内容List 长度不一致");
+                return;
+            }
+        }
+        initData();
+        initView();
         initPopupWindow();
 
     }
 
-    private void initLayout(){
-        mLinearLayout = new LinearLayout(mContext);
-        L.ee(TAG,"mLinearLayout.getWidth="+mLinearLayout.getWidth()+"mLinearLayout.getHeight()="+mLinearLayout.getHeight());
-        mLinearLayout.setBackgroundColor(0xFFFFFF);
-        mLinearLayout.setOrientation(LinearLayout.VERTICAL);
-        TextView top = new TextView(mContext);
-        TextView bottom = new TextView(mContext);
-        mLinearLayout.addView(top);
-        mLinearLayout.addView(bottom);
-
-        LinearLayout.LayoutParams topParams = new LinearLayout.LayoutParams(top.getLayoutParams());
-        topParams.weight = mConfig.mWidht;
-        topParams.height = mConfig.mHeigth/2;
-        top.setLayoutParams(topParams);
-        LinearLayout.LayoutParams bottomParams = new LinearLayout.LayoutParams(top.getLayoutParams());
-        bottomParams.weight = mConfig.mWidht;
-        bottomParams.height = mConfig.mHeigth/2;
-        bottom.setLayoutParams(bottomParams);
-
-        if (TextUtils.isEmpty(mConfig.mTopText)){
-            top.setText("top");
-        }else {
-            top.setText(mConfig.mTopText);
-
-        }
-        if (TextUtils.isEmpty(mConfig.mBottomText)){
-            bottom.setText("Bottom");
-        }else {
-            bottom.setText(mConfig.mBottomText);
-
-        }
-        if (mConfig.mTextSize == 0){
-            top.setTextSize(17);
-            bottom.setTextSize(17);
-        }else {
-            top.setTextSize(mConfig.mTextSize);
-            bottom.setTextSize(mConfig.mTextSize);
-        }
-        if (mConfig.mTopTextColor == 0){
-            top.setTextColor(0xFF000000);
-        }else {
-            top.setTextColor(mConfig.mTopTextColor);
-
-        }
-        if (mConfig.mBottomTextColor == 0){
-            bottom.setTextColor(0xFF000000);
-        }else {
-            bottom.setTextColor(mConfig.mBottomTextColor);
-
-        }
-        if (mConfig.mBgColor == 0){
-            top.setBackgroundColor(mContext.getResources().getColor(R.color.colorWhite));
-            bottom.setBackgroundColor(mContext.getResources().getColor(R.color.colorWhite));
-
-        }else {
-            top.setBackgroundColor(mConfig.mBgColor);
-            bottom.setBackgroundColor(mConfig.mBgColor);
+    private void initData(){
+        if (mConfig.showEnum == WindowBottomDialog.ShowEnum.SHARING){ //初始化item尺寸均分下的item宽度与高度
+            mConfig.itemWidht = mConfig.dialogWidht;
+            mConfig.itemHeigth = mConfig.dialogHeigth / mConfig.itemTextList.size();
         }
 
-        top.setGravity(Gravity.CENTER);
-        bottom.setGravity(Gravity.CENTER);
+    }
 
-        top.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                if (mConfig.mListener!=null){
-                    mConfig.mListener.onTopClick();
-                }
-
-            }
-        });
-
-
-
-        bottom.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                if (mConfig.mListener!=null){
-                    mConfig.mListener.onBottomClick();
-                }
-
-            }
-        });
+    private void initView(){
+        mConstraintLayout = new ConstraintLayout(mConfig.context);
+        mConstraintLayout.setBackground(WindowBottomDialogBg.dialogBg(mConfig.dialogBgColor
+                , mConfig.dialogTopLeftCornerRadius
+                , mConfig.dialogTopRightCornerRadius
+                , mConfig.dialogBottomLeftCornerRadius
+                , mConfig.dialogBottomRightCornerRadius));
+        mWindowBottomDialogAdapter = new WindowBottomDialogAdapter(mConfig);
+        RecyclerView recyclerView = new RecyclerView(mConfig.context);
+        LinearLayoutManager linearLayoutManager = new LinearLayoutManager(mConfig.context);
+        recyclerView.setLayoutManager(linearLayoutManager);
+        recyclerView.setAdapter(mWindowBottomDialogAdapter);
+        mConstraintLayout.addView(recyclerView);
+        ConstraintLayout.LayoutParams layoutParams = (ConstraintLayout.LayoutParams) recyclerView.getLayoutParams();
+        layoutParams.topToTop = layoutParams.PARENT_ID;
+        layoutParams.bottomToBottom = layoutParams.PARENT_ID;
+        layoutParams.leftToLeft = layoutParams.PARENT_ID;
+        layoutParams.rightToRight = layoutParams.PARENT_ID;
+        recyclerView.setLayoutParams(layoutParams);
 
     }
 
     private void initPopupWindow(){
-        mPopupWindow = new PopupWindow(mLinearLayout,mConfig.mWidht,mConfig.mHeigth);
+        mPopupWindow = new PopupWindow(mConstraintLayout, mConfig.dialogWidht, mConfig.dialogHeigth);
         mPopupWindow.setOutsideTouchable(true);
         mPopupWindow.setFocusable(true);
         mPopupWindow.setOnDismissListener(new PopupWindow.OnDismissListener() {
             @Override
             public void onDismiss() {
                 finishDark();
-                if (mConfig.mListener!=null){
-                    mConfig.mListener.onDismiss();
+                if (mConfig.listener!=null){
+                    mConfig.listener.onDismiss();
                 }
             }
         });
 
     }
 
+    private void onError(String e){
+        if (mConfig.listener != null){
+            mConfig.listener.onError(e);
+        }
+
+    }
+
     protected void show(){
-        mPopupWindow.showAtLocation(mConfig.mActivity.getWindow().getDecorView(),Gravity.BOTTOM,0,0);
+        mPopupWindow.showAtLocation(((Activity)mConfig.context).getWindow().getDecorView(), Gravity.BOTTOM
+                , mConfig.marginX
+                , mConfig.marginY);
         startDark();
+        if (mConfig.listener != null){
+            mConfig.listener.onShow();
+        }
 
     }
 
@@ -157,18 +125,18 @@ public class WindowBottomDialogUtil {
      * 将window界面变暗
      */
     private void startDark(){
-        WindowManager.LayoutParams params= mConfig.mActivity.getWindow().getAttributes();
+        WindowManager.LayoutParams params= ((Activity)mConfig.context).getWindow().getAttributes();
         params.alpha=0.7f;
-        mConfig.mActivity.getWindow().setAttributes(params);
+        ((Activity)mConfig.context).getWindow().setAttributes(params);
     }
 
     /**
      * 恢复window界面亮度
      */
     private void finishDark(){
-        WindowManager.LayoutParams params= mConfig.mActivity.getWindow().getAttributes();
+        WindowManager.LayoutParams params= ((Activity)mConfig.context).getWindow().getAttributes();
         params.alpha=1f;
-        mConfig.mActivity.getWindow().setAttributes(params);
+        ((Activity)mConfig.context).getWindow().setAttributes(params);
     }
 
     protected void destroy(){
@@ -178,12 +146,10 @@ public class WindowBottomDialogUtil {
         }
         if (mConfig != null){
             finishDark();
-            mConfig.mActivity = null;
+            mConfig.context = null;
             mConfig = null;
 
         }
-        mContext = null;
-        mLinearLayout = null;
     }
 
 }
